@@ -1,12 +1,10 @@
-import pandas as pd
 import json
-import time
 import os
 import numpy as np
 import tqdm
 import random
 from openai import OpenAI
-#os.environ['OPENAI_API_KEY'] = 'OPENAI_API_KEY'
+os.environ['OPENAI_API_KEY'] = 'OPENAI_API_KEY'
 
 import json
 
@@ -81,9 +79,12 @@ def user_inq(per_info, reason_info, trait_info):
         ]
     )
     response = str(completion.choices[0].message.content)
-    output = response.split('User:')[1].strip()
-
-    return output
+    print(response)
+    # Extract the output from the response if“User” eixits, delete the "User:" and any leading/trailing spaces
+    if 'User:' in response:
+        response = response.split('User:')[1].strip()
+    
+    return response
 
 def scenario_case(per_info, reason_info, trait_info, random_info):
     client = OpenAI()
@@ -110,28 +111,18 @@ def scenario_case(per_info, reason_info, trait_info, random_info):
     )
     return str(completion.choices[0].message.content)
 
-with open('implic_rea_love.jsonl', "a") as outfile:
+with open('implic_test.jsonl', "a") as outfile:
     for i in range(len(love_persona)):
-        while True:
-            try:
-                impli_rea = implic_reason(love_persona[i], love_traits[i])
-                break
-            except:
-                pass
+        impli_rea = implic_reason(love_persona[i], love_traits[i])
         for reason in impli_rea:
             random_number = random.randint(1, len(random_persona))
             random_info = random_persona[random_number]
-            while True:
-                try:
-                    result = {
-                        'persona' : love_persona[i],
-                        'reason': reason,
-                        'inquiry': user_inq(love_persona[i], reason, love_traits[i]),
-                        'scenario': scenario_case(love_persona[i], reason, love_traits[i], random_info)
-                    }
-                    break
-                except:
-                    pass
+            result = {
+                'persona' : love_persona[i],
+                'reason': reason,
+                'inquiry': user_inq(love_persona[i], reason, love_traits[i]),
+                'scenario': scenario_case(love_persona[i], reason, love_traits[i], random_info)
+            }
             print(random_info)
             json.dump(result, outfile)
             outfile.write("\n")

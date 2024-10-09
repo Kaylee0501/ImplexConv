@@ -2,7 +2,7 @@ import json
 import time
 import os
 from openai import OpenAI
-#os.environ['OPENAI_API_KEY'] = 'OPENAI_API_KEY'
+os.environ['OPENAI_API_KEY'] = 'OPENAI_API_KEY'
 
 # Open and load the JSON file
 with open('implic_rea_enjoy.jsonl', 'r') as file:

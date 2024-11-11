@@ -20,6 +20,10 @@ def conversation(scenario):
     Speaker 1 is exactly the person who encounters the scenario.
     The beginning turns should serve as a warm-up to introduce the scenario in a natural way.
     The conversation should be centered around the scenario without any irrelevant or extra information that is not related to the scenario.
+    For Spearker 1, please do not start the conversation by saying something similar to "I'm feeling a bit overwhelmed lately." or use the same format as this sentence.
+    Include diverse styles like detailed explanations, step-by-step guidance, casual small talk, humor, storytelling, and problem-solving. 
+    The conversation should feel realistic and flow naturally. 
+    Aim for a balance of formality and informality, capturing nuanced exchanges that go beyond simple responses.
     Please output the conversation in the following format:
     Speaker1: ...
     Assistant: ...

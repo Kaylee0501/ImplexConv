@@ -15,7 +15,14 @@ from LLM_Redial_New.Tools import (
 
 
 def get_top_conversation_list(
-    conv_list, model, conversation_embeddings, conversations, conversation_indices, ds
+    conv_list,
+    model,
+    conversation_embeddings,
+    conversations,
+    conversation_indices,
+    ds,
+    inquiries_embeddings=None,
+    k=5,
 ):
     print("getting top")
     top_conversation = []
@@ -41,24 +48,39 @@ def get_top_conversation_list(
         sorted_conversations = sorted(
             top_similarity_scores, key=lambda x: x[0], reverse=True
         )
-        top_score, _, _, top_index, top_summary_ind = sorted_conversations[0]
-        dialogue_list = get_top_session(ds, top_index, top_summary_ind)
+        top_k = []
+        top_k_score = []
+        for i in range(k):
+            top_score, _, _, top_index, top_summary_ind = sorted_conversations[i]
+            dialogue_list = get_top_session(ds, top_index, top_summary_ind)
 
-        # Create a new list to hold formatted strings
-        formatted_dialogues = []
+            # Create a new list to hold formatted strings
+            formatted_dialogues = []
 
-        # Iterate over each item in the dialogue list with index
-        for i, line in enumerate(dialogue_list):
-            if i % 2 == 0:  # Even index, so it's "Speaker1"
-                formatted_dialogues.append(f"Speaker1: {line}")
-            else:  # Odd index, so it's "Assistant"
-                formatted_dialogues.append(f"Assistant: {line}\n")
+            # Iterate over each item in the dialogue list with index
+            for i, line in enumerate(dialogue_list):
+                if i % 2 == 0:  # Even index, so it's "Speaker1"
+                    formatted_dialogues.append(f"Speaker1: {line}")
+                else:  # Odd index, so it's "Assistant"
+                    formatted_dialogues.append(f"Assistant: {line}\n")
 
-        # Join all formatted strings with an extra newline between entries
-        tmp = "\n".join(formatted_dialogues)
-        top_conversation.append(tmp)
-        top_conversation_score.append(top_score)
-    return top_conversation, top_conversation_score
+            # Join all formatted strings with an extra newline between entries
+            tmp = "\n".join(formatted_dialogues)
+            top_k.append(tmp)
+            top_k_score.append(top_score)
+        top_conversation.append(top_k)
+        top_conversation_score.append(top_k_score)
+    inquiry_similarities = []
+    for conv, conv_score, inquiry_emb in tqdm(
+        zip(top_conversation, top_conversation_score, inquiries_embeddings)
+    ):
+        conv_embedding = model.encode(conv, convert_to_tensor=True, device="cuda")
+        inquiry_similarities_per_conv = []
+        for conv_emb, score_emb in zip(conv_embedding, conv_score):
+            similarity = util.cos_sim(inquiry_emb, conv_emb).item()
+            inquiry_similarities_per_conv.append(similarity < score_emb)
+        inquiry_similarities.append(inquiry_similarities_per_conv)
+    return top_conversation, top_conversation_score, inquiry_similarities
 
 
 # Helper function to find top session dialogue
@@ -74,7 +96,13 @@ def get_top_session(ds, index, summary_ind):
 
 
 def get_top_conversation_list_llm_redial(
-    conv_list, model, conversation_embeddings, conversations, conversation_indices
+    conv_list,
+    model,
+    conversation_embeddings,
+    conversations,
+    conversation_indices,
+    inquiries_embeddings=None,
+    k=5,
 ):
     # print("Retrieving top conversations...")
     top_conversation = []
@@ -100,26 +128,41 @@ def get_top_conversation_list_llm_redial(
         sorted_conversations = sorted(
             top_similarity_scores, key=lambda x: x[0], reverse=True
         )
-        top_score, top_dialogue, top_index = sorted_conversations[0]
+        top_k = []
+        top_k_score = []
+        for i in range(k):
+            top_score, top_dialogue, top_index = sorted_conversations[i]
 
-        # Format the conversation
-        formatted_text = top_dialogue.replace("User", "Speaker1").replace(
-            "Agent", "Assistant"
-        )
-        formatted_dialogues = formatted_text.split("\n")
-        tmp = "\n".join(formatted_dialogues)
-        top_conversation.append(tmp)
-        top_conversation_score.append(top_score)
-
-    return top_conversation, top_conversation_score
+            # Format the conversation
+            formatted_text = top_dialogue.replace("User", "Speaker1").replace(
+                "Agent", "Assistant"
+            )
+            formatted_dialogues = formatted_text.split("\n")
+            # Join all formatted strings with an extra newline between entries
+            tmp = "\n".join(formatted_dialogues)
+            top_k.append(tmp)
+            top_k_score.append(top_score)
+        top_conversation.append(top_k)
+        top_conversation_score.append(top_k_score)
+    inquiry_similarities = []
+    for conv, conv_score, inquiry_emb in tqdm(
+        zip(top_conversation, top_conversation_score, inquiries_embeddings)
+    ):
+        conv_embedding = model.encode(conv, convert_to_tensor=True, device="cuda")
+        inquiry_similarities_per_conv = []
+        for conv_emb, score_emb in zip(conv_embedding, conv_score):
+            similarity = util.cos_sim(inquiry_emb, conv_emb).item()
+            inquiry_similarities_per_conv.append(similarity < score_emb)
+        inquiry_similarities.append(inquiry_similarities_per_conv)
+    return top_conversation, top_conversation_score, inquiry_similarities
 
 
 def generate_conversation_dataset_cc(
     model_name="dunzhang/stella_en_400M_v5",
-    input_file="full_synthetic_conversation.json",
+    input_file="full_synthetic_conversation_1.json",
     repo_name="jihyoung",
     dataset_name="ConversationChronicles",
-    output_file="full_synthetic_conversation_cc.json",
+    output_file="full_synthetic_conversation_cc_1.json",
     embedding_file="ConversationChronicles_conversation_embeddings.pkl",
     dataset_limit=1000,
 ):
@@ -184,72 +227,71 @@ def generate_conversation_dataset_cc(
 
     # Compute similarity for personas
     print("getting persona conv")
-    persona_conversation, persona_conversation_score = get_top_conversation_list(
-        conv_list=personas,
-        model=model,
-        conversation_embeddings=conversation_embeddings,
-        conversations=conversations,
-        conversation_indices=conversation_indices,
-        ds=ds,
+    inquiries = [entry["question"] for entry in sampled_data]
+    inquiries_embeddings = model.encode(
+        inquiries, convert_to_tensor=True, device="cuda"
     )
-    print("getting reason conv")
-    reason_conversation, reason_conversation_score = get_top_conversation_list(
-        conv_list=reasons,
-        model=model,
-        conversation_embeddings=conversation_embeddings,
-        conversations=conversations,
-        conversation_indices=conversation_indices,
-        ds=ds,
-    )
-    # Use list comprehension to get all conversations and scores in one pass
-    print("getting noisy conv")
-    results = [
+    persona_conversation, persona_conversation_score, inquiry_similarities = (
         get_top_conversation_list(
-            conv_list=noisy,
+            conv_list=personas,
             model=model,
             conversation_embeddings=conversation_embeddings,
             conversations=conversations,
             conversation_indices=conversation_indices,
             ds=ds,
+            inquiries_embeddings=inquiries_embeddings,
         )
-        for noisy in tqdm(noisy_scenarios)
-    ]
+    )
+    # print("getting reason conv")
+    # reason_conversation, reason_conversation_score = get_top_conversation_list(
+    #     conv_list=reasons,
+    #     model=model,
+    #     conversation_embeddings=conversation_embeddings,
+    #     conversations=conversations,
+    #     conversation_indices=conversation_indices,
+    #     ds=ds,
+    # )
+    # # Use list comprehension to get all conversations and scores in one pass
+    # print("getting noisy conv")
+    # results = [
+    #     get_top_conversation_list(
+    #         conv_list=noisy,
+    #         model=model,
+    #         conversation_embeddings=conversation_embeddings,
+    #         conversations=conversations,
+    #         conversation_indices=conversation_indices,
+    #         ds=ds,
+    #     )
+    #     for noisy in tqdm(noisy_scenarios)
+    # ]
 
-    # Unpack the results into separate lists for conversations and scores
-    noisy_scenarios_conv, noisy_scenarios_score = zip(*results)
+    # # Unpack the results into separate lists for conversations and scores
+    # noisy_scenarios_conv, noisy_scenarios_score = zip(*results)
 
     # Build JSON structure
     i = 0
-    for pc, rc, pc_score, rc_score, noisy_cov, noisy_cov_score in zip(
-        persona_conversation,
-        reason_conversation,
-        persona_conversation_score,
-        reason_conversation_score,
-        noisy_scenarios_conv,
-        noisy_scenarios_score,
+    for pc, pc_score, inquiry_score in zip(
+        persona_conversation, persona_conversation_score, inquiry_similarities
     ):
+
         json_dict = {
-            "cc_trait_conv": pc,
-            "cc_reasoning_conv": rc,
-            "cc_noisy_conv": noisy_cov,
-            "cc_trait_conv_score": pc_score,
-            "cc_reaosning_conv_score": rc_score,
-            "cc_noisy_conv_score": noisy_cov_score,
+            "cc_noisy_conv": pc,
+            "cc_noisy_conv_score": pc_score,
+            "cc_inquiry_bool": inquiry_score,
         }
-        data[i].update(json_dict)
+        sampled_data[i].update(json_dict)
         i += 1
 
     # Save JSON data
-    with open(output_file, "a") as outfile:
-        json.dump(data, outfile)
-
+    with open(output_file, "w") as outfile:
+        json.dump(sampled_data, outfile)
     print(f"Data saved successfully to {output_file}")
 
 
 def generate_conversation_dataset_llm_redial(
     model_name="dunzhang/stella_en_400M_v5",
-    input_file="full_synthetic_conversation_cc.json",
-    output_file="full_synthetic_conversation_cc_redial.json",
+    input_file="full_synthetic_conversation_cc_1.json",
+    output_file="full_synthetic_conversation_cc_redial_1.json",
     embedding_dir="LLM_Redial_conversation_embeddings",
     dataset_limit=3000,
 ):
@@ -259,13 +301,16 @@ def generate_conversation_dataset_llm_redial(
     # Load input JSON file
     with open(input_file, "r") as file:
         data = json.load(file)
-    # data = random.sample(data, 1)
+    # data = random.sample(data, 2)
 
     # Extract persona, reason, and noisy scenarios from input data
     personas = [entry["persona"] for entry in data]
     reasons = [entry["reason"] for entry in data]
     noisy_scenarios = [entry["noisy_scenarios"] for entry in data]
-
+    inquiries = [entry["question"] for entry in data]
+    inquiries_embeddings = model.encode(
+        inquiries, convert_to_tensor=True, device="cuda"
+    )
     # Loop through each item category
     items = ["Movie", "Books", "Electronics", "Sports"]
     for item in items:
@@ -342,59 +387,50 @@ def generate_conversation_dataset_llm_redial(
 
     # Retrieve top conversations for personas, reasons, and noisy scenarios
     print("Retrieving persona conversations...")
-    persona_conversation, persona_conversation_score = (
+    persona_conversation, persona_conversation_score, inquiries_similarities = (
         get_top_conversation_list_llm_redial(
             conv_list=personas,
             model=model,
             conversation_embeddings=conversation_embeddings,
             conversations=conversations,
             conversation_indices=conversation_indices,
+            inquiries_embeddings=inquiries_embeddings,
         )
     )
 
-    print("Retrieving reason conversations...")
-    reason_conversation, reason_conversation_score = (
-        get_top_conversation_list_llm_redial(
-            conv_list=reasons,
-            model=model,
-            conversation_embeddings=conversation_embeddings,
-            conversations=conversations,
-            conversation_indices=conversation_indices,
-        )
-    )
+    # print("Retrieving reason conversations...")
+    # reason_conversation, reason_conversation_score = (
+    #     get_top_conversation_list_llm_redial(
+    #         conv_list=reasons,
+    #         model=model,
+    #         conversation_embeddings=conversation_embeddings,
+    #         conversations=conversations,
+    #         conversation_indices=conversation_indices,
+    #     )
+    # )
 
-    print("Retrieving noisy conversations...")
-    noisy_results = [
-        get_top_conversation_list_llm_redial(
-            conv_list=noisy,
-            model=model,
-            conversation_embeddings=conversation_embeddings,
-            conversations=conversations,
-            conversation_indices=conversation_indices,
-        )
-        for noisy in tqdm(noisy_scenarios, desc="Processing noisy scenarios")
-    ]
-    noisy_scenarios_conv, noisy_scenarios_score = zip(*noisy_results)
+    # print("Retrieving noisy conversations...")
+    # noisy_results = [
+    #     get_top_conversation_list_llm_redial(
+    #         conv_list=noisy,
+    #         model=model,
+    #         conversation_embeddings=conversation_embeddings,
+    #         conversations=conversations,
+    #         conversation_indices=conversation_indices,
+    #     )
+    #     for noisy in tqdm(noisy_scenarios, desc="Processing noisy scenarios")
+    # ]
+    # noisy_scenarios_conv, noisy_scenarios_score = zip(*noisy_results)
 
     # Append retrieved data to each entry in the original data
-    for i, (pc, rc, pc_score, rc_score, noisy_conv, noisy_conv_score) in enumerate(
-        zip(
-            persona_conversation,
-            reason_conversation,
-            persona_conversation_score,
-            reason_conversation_score,
-            noisy_scenarios_conv,
-            noisy_scenarios_score,
-        )
+    for i, (pc, pc_score, inquiry_bool) in enumerate(
+        zip(persona_conversation, persona_conversation_score, inquiries_similarities)
     ):
         data[i].update(
             {
                 "llmredial_trait_conv": pc,
-                "llmredial_cc_reasoning_conv": rc,
-                "llmredial_cc_noisy_conv": noisy_conv,
                 "llmredial_cc_trait_conv_score": pc_score,
-                "llmredial_cc_reasoning_conv_score": rc_score,
-                "llmredial_cc_noisy_conv_score": noisy_conv_score,
+                "llmredial_inquiry_bool": inquiry_bool,
             }
         )
 
@@ -406,5 +442,5 @@ def generate_conversation_dataset_llm_redial(
 
 
 # Example usage
-# generate_conversation_dataset_cc()
+generate_conversation_dataset_cc()
 generate_conversation_dataset_llm_redial()

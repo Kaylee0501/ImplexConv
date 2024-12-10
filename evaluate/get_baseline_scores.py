@@ -99,7 +99,7 @@ if __name__ == "__main__":
     question = "What sports can I play to improve my overall fitness and have fun at the same time?"
     response = "You can play sports like basketball, soccer, or tennis to improve your fitness and have fun."
     reason = "I have ankle pain and need to avoid high-impact sports."
-    GROQ_API_KEY = "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"
+
 
     # # Evaluate the response using the LLM
     llm = ChatGroq(

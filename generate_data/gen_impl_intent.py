@@ -7,8 +7,8 @@ import random
 import openai
 import json
 from sentence_transformers import SentenceTransformer
-os.environ['SAMBANOVA_API_KEY'] = 'KEY'
-os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+os.environ['SAMBANOVA_API_KEY'] = 'API_KEY'
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 def implic_reason(per_info, traits_info):
 
@@ -145,6 +145,37 @@ def gen_question(per_info):
     )
     return str(completion.choices[0].message.content)
 
+def noisy_scenario(persona, question, traits_info):
+    client = openai.OpenAI(
+        api_key=os.environ.get("SAMBANOVA_API_KEY"),
+        base_url="https://api.sambanova.ai/v1",
+    )
+    prompt = f'''
+    Given question: {question}
+    Can you give me 5 implicit scenarios for this person that supports this question? Therefore, if I ask you, "Does {persona}?", you have to answer "yes". 
+    The reason information should be completely different from each other and belong to different categories.
+    The reason cannot include words related to "{traits_info}".
+    The scenarios should contain only one sentence.
+    Please output the scenarios only with the index number using the format below.
+    1. ...
+    2. ...
+    '''
+    completion = client.chat.completions.create(
+    model='Meta-Llama-3.1-405B-Instruct',
+    messages=[
+                {"role":"system","content":"You are a helpful assistant"},
+                {"role":"user","content": prompt}
+              ],
+    temperature =  1,
+    top_p = 0.9
+    )
+    result = str(completion.choices[0].message.content)
+    final_result = []
+    for a in result.split('. ')[1:]:
+        final_result.append(a.split('\n')[0])
+
+    return final_result
+
 def conversation(scenario):
     client = openai.OpenAI(
         api_key=os.environ.get("SAMBANOVA_API_KEY"),
@@ -183,76 +214,106 @@ def conversation(scenario):
 def main(
         home_dir = './datasets/impl_reasoning',
         input_file = 'hobbies.json',
-        output_file = 'implic_intent4.jsonl'
+        output_file = 'final_syn_intent_conv3.jsonl'
     ):
     with open(f'{home_dir}/{input_file}', 'r') as file:
         #data = json.load(file)
-        data = json.load(file)[30000:40000]
+        data = json.load(file)[25020:30000]
 
     model = SentenceTransformer("dunzhang/stella_en_1.5B_v5", trust_remote_code=True).cuda()
 
-    persona = []
-    traits = []
     for line in data:
-        if len(line.split()) > 3:
-            persona.append(line)
-            traits.append(' '.join(line.split()[3:]))
+        persona = line
+        traits = ' '.join(line.split()[3:])
+        print(f'persona: {persona}')
 
-    with open(f'{home_dir}/{output_file}', "a") as outfile:
-        for i in range(len(persona)):
-            while True:
-                try:
-                    impli_rea = implic_reason(persona[i], traits[i])
-                    break
-                except Exception as e:
-                    if e == KeyboardInterrupt:
-                        raise e
-                    else:
-                        pass
-            embeddings = model.encode(impli_rea)
-            similarities = model.similarity(embeddings, embeddings)
-            #print(similarities)
-            selected_indices = select_unique_reasons(similarities, 0.55)
-            selected_reasons = [impli_rea[i] for i in selected_indices]
 
-            while True:
-                try:
-                    best_reason = select_reason(persona[i], selected_reasons)
-                    break
-                except Exception as e:
-                    if e == KeyboardInterrupt:
-                        raise e
-                    else:
-                        pass
+        while True:
+            try:
+                impli_rea = implic_reason(persona, traits)
+                break
+            except Exception as e:
+                if e == KeyboardInterrupt:
+                    raise e
+                else:
+                    pass
+        print(f'implicit reasons: {impli_rea}')
+        embeddings = model.encode(impli_rea)
+        similarities = model.similarity(embeddings, embeddings)
+        #print(similarities)
+        selected_indices = select_unique_reasons(similarities, 0.55)
+        selected_reasons = [impli_rea[i] for i in selected_indices]
 
-            print(f'best reason: {best_reason}')
+        while True:
+            try:
+                best_reason = select_reason(persona, selected_reasons)
+                break
+            except Exception as e:
+                if e == KeyboardInterrupt:
+                    raise e
+                else:
+                    pass
+
+        print(f'best reason: {best_reason}')
+        while True:
+            try:
+                question = gen_question(persona)
+                break
+            except Exception as e:
+                if e == KeyboardInterrupt:
+                    raise e
+                else:
+                    pass
+        
+        print(f'question: {question}')
+        while True:
+            try:
+                reason_conv = conversation(best_reason)
+                break
+            except Exception as e:
+                if e == KeyboardInterrupt:
+                    raise e
+                else:
+                    pass
+
+        print(f'conversation reasoning: {reason_conv}')
+
+        while True:
+            try:
+                noisy_scenarios = noisy_scenario(persona, question, traits)
+                break
+            except Exception as e:
+                if e == KeyboardInterrupt:
+                    raise e
+                else:
+                    pass
+        print(f"Noisy scenarios: {noisy_scenarios}")
+
+        noisy_convs = []
+        for scen in noisy_scenarios:
             while True:
                 try:
-                    question = gen_question(persona[i])
+                    noisy_conv = conversation(scen)
                     break
                 except Exception as e:
                     if e == KeyboardInterrupt:
                         raise e
                     else:
                         pass
-            
-            print(f'question: {question}')
-            while True:
-                try:
-                    reason_conv = conversation(best_reason)
-                    break
-                except Exception as e:
-                    if e == KeyboardInterrupt:
-                        raise e
-                    else:
-                        pass
-            
-            result = {'persona' : persona[i],
-                    'reason': selected_reasons,
-                    'best_reason': best_reason,
-                    'inquiry': question,
-                    'conversation_reasoning': reason_conv}
-            json.dump(result, outfile, indent=4)
+            print(f"Noisy conversation: {noisy_conv}")
+            noisy_convs.append(noisy_conv)
+        
+        result = {
+            'persona' : persona,
+            'reason': best_reason,
+            'inquiry': question,
+            "noisy_scenarios": noisy_scenarios,
+            "syn_reasoning_conv": reason_conv,
+            "noisy_conv": noisy_convs,
+            }
+        
+        with open(f'{home_dir}/{output_file}', "a") as outfile:
+            json.dump(result, outfile)
             outfile.write("\n")
 
 

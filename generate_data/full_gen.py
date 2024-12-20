@@ -8,27 +8,31 @@ import openai
 import json
 from sentence_transformers import SentenceTransformer
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-os.environ['SAMBANOVA_API_KEY'] = 'KEY'
+os.environ["CUDA_VISIBLE_DEVICES"] = "6"
+os.environ['SAMBANOVA_API_KEY'] = 'API_KEY'
 
 
-def user_inq_1(per_info, reason_info, trait_info):
+def user_inq(per_info, reason_info):
     client = openai.OpenAI(
         api_key=os.environ.get("SAMBANOVA_API_KEY"),
         base_url="https://api.sambanova.ai/v1",
     )
     
     prompt = f'''
-    {per_info} However, they cannot do that activity recently because {reason_info}. Can you come up with a high-level question with an answer other than {trait_info}? 
-    The question should be vague.
-    Ask the question in the first person.
-    The question should not mention that something is wrong.
-    The question should not mention that they want something other than their usual activity.
-    The question should not include words like "recently, other, new".
-    Make sure all the words in the answer and reason do not exist in the question. 
-    Please output the inquiry with the format in one line without any additional sentences: 
-    User:
+    Here's the conversation between a user(speaker 1) and a chatbot assistant.
+    Speaker 1 has the following persona trait: {per_info}. However, speaker 1 cannot do the trait due to the reason that {reason_info}. 
+    Now, speaker 1 ask you a question related to the trait. {reason_info} affect your answer to this question.
+    You should tell speark 1 they cannot do the trait due to the reason.
+    The trait should be mentioned in the question.
+    The question itself should not mention the reason or affect by the reason.
+    Questions should be asked in the first person. Include "I".
+    The question should not be a yes/no question. 
+    The question needs to be diverse.
+
+    Please only output the question in the format of less than 20 words without any additional sentences.
+
     '''
+
     completion = client.chat.completions.create(
     model='Meta-Llama-3.1-405B-Instruct',
     messages=[
@@ -45,6 +49,43 @@ def user_inq_1(per_info, reason_info, trait_info):
         response = response.split('User:')[1].strip()
     
     return response
+
+def noisy_scenario(persona, question, traits_info):
+    client = openai.OpenAI(
+        api_key=os.environ.get("SAMBANOVA_API_KEY"),
+        base_url="https://api.sambanova.ai/v1",
+    )
+    prompt = f'''
+    Consider a person with specific personality traits {persona} that could serve as responses to a given question {question}. 
+    Can you generate additional scenarios that reflect or align with these personality traits to support the question?
+    Please output 5 scenarios that are relevant to the given traits and question.
+    The scenarios should contain only one sentence.
+    The scenarios can talk about both {traits_info} or other stuff that is related to {traits_info} but do not have to be the same.
+    Please output the scenarios only with the index number.
+
+    For example:
+
+    Trait: I love sports
+    Question: I'm bored; can you give me some suggestions?
+    Scenarios:
+    1. I love playing basketball.
+    2. My favorite basketball player is Stephen Curry.
+    '''
+    completion = client.chat.completions.create(
+    model='Meta-Llama-3.1-405B-Instruct',
+    messages=[
+                {"role":"system","content":"You are a helpful assistant"},
+                {"role":"user","content": prompt}
+              ],
+    temperature =  1,
+    top_p = 0.9
+    )
+    result = str(completion.choices[0].message.content)
+    final_result = []
+    for a in result.split('. ')[1:]:
+        final_result.append(a.split('\n')[0])
+
+    return final_result
 
 def conversation(scenario):
     client = openai.OpenAI(
@@ -120,15 +161,15 @@ def select_question(model, reason, inquiries, query_prompt_name = "s2s_query"):
 
 def main(
         home_dir = './datasets/impl_reasoning',
-        input_file = 'sel_implic_reason2.json',
-        output_file = 'sel_implic_full2.jsonl'
+        input_file = 'sel_implic_reason3.json',
+        output_file = 'sel_implic_full3.jsonl'
     ):
     with open(f'{home_dir}/{input_file}', 'r') as file:
         data = json.load(file)
 
     model = SentenceTransformer("dunzhang/stella_en_1.5B_v5", trust_remote_code=True).cuda()
 
-    for line in data:
+    for line in data[906:]:
         persona = line['persona']
         impli_reas = line['reason_extreme']
         traits = ' '.join(persona.split()[3:])
@@ -147,21 +188,16 @@ def main(
                 else:
                     pass
 
-        inquiries = []
-        for reason in impli_reas:
-            while True:
-                try:
-                    inquiry = user_inq_1(persona, reason, traits)
-                    break
-                except Exception as e:
-                    if e == KeyboardInterrupt:
-                        raise e
-                    else:
-                        pass
-            print(inquiry)
-            inquiries.append(inquiry)
-
-        best_question = select_question(model, best_reason, inquiries)
+        while True:
+            try:
+                inquiry = user_inq(persona, best_reason)
+                break
+            except Exception as e:
+                if e == KeyboardInterrupt:
+                    raise e
+                else:
+                    pass
+        print(f'inquiry: {inquiry}')
 
         while True:
             try:
@@ -182,15 +218,40 @@ def main(
                     raise e
                 else:
                     pass
+
+        while True:
+            try:
+                noisy_scenarios = noisy_scenario(persona, inquiry, traits)
+                break
+            except Exception as e:
+                if e == KeyboardInterrupt:
+                    raise e
+                else:
+                    pass
+        print(f"Noisy scenarios: {noisy_scenarios}")
+
+        noisy_convs = []
+        for scen in noisy_scenarios:
+            while True:
+                try:
+                    noisy_conv = conversation(scen)
+                    break
+                except Exception as e:
+                    if e == KeyboardInterrupt:
+                        raise e
+                    else:
+                        pass
+            print(f"Noisy conversation: {noisy_conv}")
+            noisy_convs.append(noisy_conv)
         
         result = {
             'persona' : persona,
-            'reason_candidates': impli_reas,
-            'best_reason': best_reason,
-            'question': inquiries,
-            'selected_question': best_question,
-            'conversation_trait': trait_conv,
-            'conversation_reasoning': rea_conv
+            'reason': best_reason,
+            "question": inquiry,
+            "noisy_scenarios": noisy_scenarios,
+            "syn_trait_conv": trait_conv,
+            "syn_reasoning_conv": rea_conv,
+            "noisy_conv": noisy_convs,
         }
 
         with open(f'{home_dir}/{output_file}', "a") as outfile:

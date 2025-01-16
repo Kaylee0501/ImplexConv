@@ -11,7 +11,7 @@ import openai
 
 def dataset_process(home_dir, dataset_name):
     if dataset_name == 'MSC':
-        input_file = f'{home_dir}/msc/MSC/sequential_msc.json'
+        input_file = f'{home_dir}/MSC/sequential_msc.json'
 
         with open(input_file, 'r') as f:
             data = json.load(f)
@@ -92,12 +92,8 @@ def dataset_process(home_dir, dataset_name):
     
     elif dataset_name == 'dailydialog':
         test_file = f'{home_dir}/dailydialog/test.jsonl'
-        valid_file = f'{home_dir}/dailydialog/valid.jsonl'
         data = []
         with open(test_file, 'r') as file:
-            for line in file:
-                data.append(json.loads(line))
-        with open(valid_file, 'r') as file:
             for line in file:
                 data.append(json.loads(line))
         ## single session dialog
@@ -105,18 +101,16 @@ def dataset_process(home_dir, dataset_name):
         conversations = []
         qa_pairs = []
         for items in data:
+            if(len(items['dialogue']) < 8):
+                continue
             dialog = ''
-            qa = []
-            for i, content in enumerate(items['dialogue']):
+            for i, content in enumerate(items['dialogue'][:len(items['dialogue'])-2]):
                 if i % 2 == 0:
-                    pair_dict = {}
                     dialog += 'SPEAKER_1: ' + content['text'] + '\n'
-                    pair_dict['question'] = content['text']
                 else:
                     dialog += 'SPEAKER_2: ' + content['text']  + '\n'
-                    pair_dict['answer'] = content['text']
-                    qa.append(pair_dict)
             conversations.append([dialog])
+            qa = [{'question': items['dialogue'][-2]['text'], 'answer': items['dialogue'][-1]['text']}]
             qa_pairs.append(qa)
         return conversations, qa_pairs
     
@@ -139,13 +133,17 @@ def dataset_process(home_dir, dataset_name):
                     dialogs = ''
                     for text in chat_dic[f'session_{i}']:
                         if text['speaker'] == speaker_1:
-                            dialogs += 'SPEAKER_1: ' + text['text'] + '\n'
+                            dialogs += speaker_1 + ': ' + text['text'] + '\n'
                         else:
-                            dialogs += 'SPEAKER_2: ' + text['text'] + '\n'
+                            dialogs += speaker_2 + ': ' + text['text'] + '\n'
                     dialog_session.append(dialogs)
                     i += 1
                 else:
                     break
             conversations.append(dialog_session)
-            qa_pairs.append(items['qa'])
+            select_qa_pair = []
+            for qa in items['qa']:
+               if qa['question'][:4] != 'When':
+                   select_qa_pair.append(qa)
+            qa_pairs.append(select_qa_pair)
         return conversations, qa_pairs

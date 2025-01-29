@@ -7,8 +7,8 @@ from data_process import dataset_process
 from utils import evaluate_bleu, calculate_rouge_l
 from sentence_transformers import SentenceTransformer
 
-os.environ['OPENAI_API_KEY'] = ' REMOVED'
-os.environ['SAMBANOVA_API_KEY'] = 'bfeb45e5-df9c-4193-b249-73fdbb6b78e1'
+os.environ['OPENAI_API_KEY'] = 'API-KEY'
+os.environ['SAMBANOVA_API_KEY'] = 'API-KEY'
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 

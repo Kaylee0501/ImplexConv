@@ -73,6 +73,33 @@ def sum_fact(scenario, model_type):
     response = str(completion.choices[0].message.content)
     return response, speaker1, speaker2
 
+def sum_fact_reasoning(scenario, model_type):
+    
+    if model_type == 'Meta-Llama-3.1-405B-Instruct':
+        client = openai.OpenAI(
+            api_key=os.environ.get("SAMBANOVA_API_KEY"),
+            base_url="https://api.sambanova.ai/v1",
+        )
+    else:
+        client = OpenAI()
+
+    prompt = f''' Given {scenario}.
+    Can you first summarize the conversation to only contain the main information with the format <<Summary:>>,
+    and then find the summarized key personalization facts for Speaker1 that already happened and only include long-term effects. 
+    Please only output facts without any other reasons or further explanation with the format:
+    <<Speaker1:>> (1). (2). (3)....
+    '''
+    completion = client.chat.completions.create(
+        # model="gpt-4-turbo-preview",
+        model= model_type,
+        messages=[
+            {"role": "system", "content": "You are an expert in generate high level personal question."},
+            {"role": "user", "content": prompt }
+        ]
+    )
+    response = str(completion.choices[0].message.content)
+    return response
+
 def evaluate_bleu(reference, response):
     # Convert reference and response to list of tokens
     reference_tokens = reference.split()
@@ -108,3 +135,34 @@ def calculate_rouge_l(candidate, reference):
     # Compute ROUGE-L
     scores = scorer.score(reference, candidate)
     return scores['rougeL']
+
+def process_sessions(file_path):
+    sessions = []
+    current_session = []
+
+    with open(file_path, 'r') as file:
+        for line in file:
+            line = line.strip()  # Remove leading/trailing whitespace
+            if line.isdigit():  # Check if the line is an index number
+                if current_session:
+                    sessions.append("\n".join(current_session))  # Join turns with newlines
+                    current_session = []  # Reset for the next session
+            else:
+                # Replace User: and Agent: with Speaker: and Assistant:
+                formatted_line = line.replace("User:", "Speaker1:").replace("Agent:", "Assistant:")
+                current_session.append(formatted_line)  # Add the formatted line to the session
+
+    # Add the last session to the list if it exists
+    if current_session:
+        sessions.append("\n".join(current_session))
+
+    return sessions
+
+
+def process_redial(home_dir):
+    name_list = ['Books', 'Electronics', 'Movie', 'Sports']
+    session_list = []
+    for name in name_list:
+        file_path = f'{home_dir}/LLM_Redial/{name}/Conversation.txt'
+        session_list.extend(process_sessions(file_path))
+    return session_list

@@ -7,9 +7,9 @@ from data_process import dataset_process
 from utils import evaluate_bleu, calculate_rouge_l
 from sentence_transformers import SentenceTransformer
 
-os.environ['OPENAI_API_KEY'] = 'API-KEY'
-os.environ['SAMBANOVA_API_KEY'] = 'API-KEY'
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ['OPENAI_API_KEY'] = ' REMOVED'
+os.environ['SAMBANOVA_API_KEY'] = 'bfeb45e5-df9c-4193-b249-73fdbb6b78e1'
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 
 def get_fact(text):
@@ -59,9 +59,9 @@ def summarized_topic(text, model_type = 'gpt-4o-mini'):
 def select_facts(question, topic_list, topic_dic, encode_model, model_type = 'gpt-4o-mini'):
     client = OpenAI()
     prompt = f'''
-    Given question {question}, can you select all possible topics below that are related to the question?
+    Given question {question}, can you select topics below that are possibly related to the answer to the question?
     topics: {topic_list}
-    Please only output the names of topics without changing any words. Each topic should be separated by a semicolon.
+    Please only output the full names of topics without changing any words. Each topic should be separated by a semicolon.
     '''
     completion = client.chat.completions.create(
         # model="gpt-4-turbo-preview",
@@ -113,7 +113,7 @@ def get_clustered_facts(speaker_fact, model, cluster_num, model_type):
 
     return summarized_facts, topic_dic
 
-def rag_original(question, summarization_list, original_list, model, top_k=2):
+def rag_original(question, summarization_list, original_list, model, top_k=5):
     question_embeddings = model.encode(question)
     summary_embeddings = model.encode(summarization_list)
     original_embeddings = model.encode(original_list)
@@ -131,15 +131,14 @@ def rag_original(question, summarization_list, original_list, model, top_k=2):
             sel_org_list.append(original_list[idx])
     return sel_sum_list, sel_org_list
 
-def fact_prompt(conversation, question, speaker1_fact, speaker2_fact):
+def fact_prompt(question, speaker1_name, speaker1_fact, speaker2_name, speaker2_fact):
     client = OpenAI()
     prompt = f'''
-    Speaker1 has the following personal traits: {speaker1_fact}.
-    Speaker2 has the following personal traits: {speaker2_fact}.
-    Given their previous conversations {conversation} as background information, can you generate a response answer for speaker2 when speaker1 says {question}?
-    Your answer should be aligned with the personal traits of speaker1 and speaker2.
-    Your answer should also recall the previous conversation between speaker1 and speaker2.
-    The response should be in one sentence with no more than 30 words.
+    {speaker1_name} has the following personal traits: {speaker1_fact}.
+    {speaker2_name} has the following personal traits: {speaker2_fact}.
+    Can you answer the question: {question} based on the useful traits?
+    Your answer should be aligned with the personal traits of {speaker1_name} and {speaker2_name}.
+    The response should be in one sentence with no more than 15 words.
     '''
     completion = client.chat.completions.create(
         # model="gpt-4-turbo-preview",
@@ -152,12 +151,12 @@ def fact_prompt(conversation, question, speaker1_fact, speaker2_fact):
     response = str(completion.choices[0].message.content)
     return response
 
-def long_context_prompt(conversation, question):
+def long_context_prompt(conversation, question, speaker1, speaker2):
     client = OpenAI()
     prompt = f'''
-    Given their previous conversations {conversation} as background information, can you generate a response answer for speaker2 when speaker1 says {question}?
-    Your answer should also recall the previous conversation between speaker1 and speaker2.
-    The response should be in one sentence with no more than 30 words.
+    Given the previous conversations {conversation} as background information, can you answer the question: {question}?
+    Your answer should also recall the previous conversation between {speaker1} and {speaker2}.
+    The response should be in one sentence with no more than 15 words.
     '''
     completion = client.chat.completions.create(
         # model="gpt-4-turbo-preview",
@@ -170,14 +169,13 @@ def long_context_prompt(conversation, question):
     response = str(completion.choices[0].message.content)
     return response
 
-def rag_sumy_prompt(conversation, summary, question):
+def rag_sumy_prompt(summary, question, speaker1, speaker2):
     client = OpenAI()
     prompt = f'''
-    There is the related summary of speaker1 and speaker2's conversation: {summary}.
-    Given their previous conversations {conversation} as background information, can you generate a response answer for speaker2 when speaker1 says {question}?
-    Your answer should be aligned with the personal traits of speaker1 and speaker2.
-    Your answer should also recall the previous conversation between speaker1 and speaker2.
-    The response should be in one sentence with no more than 30 words.
+    Given the related summary of {speaker1} and {speaker2}'s conversation: {summary} as background information, can you answer the question: {question}?
+    Your answer should be aligned with the personal traits of {speaker1} and {speaker2}.
+    Your answer should also recall the previous conversation between {speaker1} and {speaker2}.
+    The response should be in one sentence with no more than 15 words.
     '''
     completion = client.chat.completions.create(
         # model="gpt-4-turbo-preview",
@@ -190,14 +188,32 @@ def rag_sumy_prompt(conversation, summary, question):
     response = str(completion.choices[0].message.content)
     return response
 
-def rag_original_prompt(conversation, original, question):
+def rag_original_prompt(original, question, speaker1, speaker2):
     client = OpenAI()
     prompt = f'''
-    There is the related conversation of speaker1 and speaker2: {original}.
-    Given their previous conversations {conversation} as background information, can you generate a response answer for speaker2 when speaker1 says {question}?
-    Your answer should be aligned with the personal traits of speaker1 and speaker2.
-    Your answer should also recall the previous conversation between speaker1 and speaker2.
-    The response should be in one sentence with no more than 30 words.
+    Given the related conversation of {speaker1} and {speaker2}: {original} as background information, can you answer the question: {question}?
+    Your answer should be aligned with the personal traits of {speaker1} and {speaker2}.
+    Your answer should also recall the previous conversation between {speaker1} and {speaker2}.
+    The response should be in one sentence with no more than 15 words.
+    '''
+    completion = client.chat.completions.create(
+        # model="gpt-4-turbo-preview",
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are an expert in generate high level personal question."},
+            {"role": "user", "content": prompt }
+        ]
+    )
+    response = str(completion.choices[0].message.content)
+    return response
+
+
+def sel_fact_prompt(question, speaker_fact, speaker_name):
+    client = OpenAI()
+    prompt = f'''
+    Given {speaker_name} has the following personal traits: {speaker_fact}. Can you answer the question: {question} based on the useful traits?
+    Your answer should be aligned with the personal traits of {speaker_name}.
+    The response should be in one sentence with no more than 15 words.
     '''
     completion = client.chat.completions.create(
         # model="gpt-4-turbo-preview",
@@ -213,10 +229,11 @@ def rag_original_prompt(conversation, original, question):
 
 def main(
         home_dir = './datasets',
-        dataset_name = 'CC',
+        dataset_name = 'locomo',
         model_type = 'gpt-4o-mini',
         summy_info = 'summarized_facts.json',
-        output_file = 'full_response.json',
+        output_response_file = 'full_response.json',
+        output_retrieve_file = 'retrieve_text.json'
     ):
 
     conversations, questions = dataset_process(home_dir, dataset_name)
@@ -224,79 +241,113 @@ def main(
         sum_fact = json.load(f)
 
     print(dataset_name)
-    if os.path.exists(f'{home_dir}/{dataset_name}/{output_file}'):
-        with open(f'{home_dir}/{dataset_name}/{output_file}', 'r') as f:
+    if os.path.exists(f'{home_dir}/{dataset_name}/{output_response_file}'):
+        with open(f'{home_dir}/{dataset_name}/{output_response_file}', 'r') as f:
             final_response = json.load(f)
     else:
         final_response = []
+    
+    if os.path.exists(f'{home_dir}/{dataset_name}/{output_retrieve_file}'):
+        with open(f'{home_dir}/{dataset_name}/{output_retrieve_file}', 'r') as f:
+            retrieve_text = json.load(f)
+    else:
+        retrieve_text = []
         
     model = SentenceTransformer("dunzhang/stella_en_1.5B_v5", trust_remote_code=True).cuda()
 
-    for index, uni_fact in enumerate(sum_fact[len(final_response):]):
+    for index, uni_fact in enumerate(sum_fact[len(final_response):]):        
+        user_name = []
+        for name in uni_fact[0]:
+            if name != 'summary':
+                user_name.append(name[:-5])
         
         speaker1_fact = []
         speaker2_fact = []
         for conv in uni_fact:
-            speaker1 = conv['SPEAKER_1_fact']
-            speaker2 = conv['SPEAKER_2_fact']
+            speaker1 = conv[f'{user_name[0]}_fact']
+            speaker2 = conv[f'{user_name[1]}_fact']
             speaker1_fact.extend(get_fact(speaker1))
             speaker2_fact.extend(get_fact(speaker2))
 
         speaker1_fact = get_distinct_facts(speaker1_fact, 0.9, model)
         speaker2_fact = get_distinct_facts(speaker2_fact, 0.9, model)
 
-        print(f'speaker1_fact {speaker1_fact}')
-        print(f'speaker2_fact {speaker2_fact}')
+        print(f'{user_name[0]}_fact {speaker1_fact}')
+        print(f'{user_name[1]}_fact {speaker2_fact}')
 
-        summarized_facts1, topic_dic1 = get_clustered_facts(speaker1_fact, model, 5, model_type)
-        summarized_facts2, topic_dic2 = get_clustered_facts(speaker2_fact, model, 5, model_type)
+        summarized_facts1, topic_dic1 = get_clustered_facts(speaker1_fact, model, 15, model_type)
+        summarized_facts2, topic_dic2 = get_clustered_facts(speaker2_fact, model, 15, model_type)
 
         summarization_list = []
-        for item in uni_fact[:4]:
+        for item in uni_fact:
             summarization_list.append(item['summary'])
 
         prev_conversation = ''
-        for conv in conversations[index][:4]:
+        for conv in conversations[index]:
             prev_conversation += conv
 
-        cur_turn = ''
-        long_content_turn = prev_conversation
         response_texts = []
+        retrevial_texts = []
         for qa_pair in questions[index]:
-            all_response_dic = {'ground_truth': qa_pair['answer']}
+            for key in qa_pair:
+                if 'answer' in key:
+                    all_response_dic = {key: qa_pair[key]}
             all_response_dic['question'] = qa_pair['question']
-            select_facts1 = select_facts(qa_pair['question'], summarized_facts1, topic_dic1, model, model_type)
-            select_facts2 = select_facts(qa_pair['question'], summarized_facts2, topic_dic2, model, model_type)
+            all_retrevial_dic = {'question': qa_pair['question']}
+            flag = 0
+            if user_name[0] in qa_pair['question']:
+                sel_facts = select_facts(qa_pair['question'], summarized_facts1, topic_dic1, model, model_type)
+                select_name = user_name[0]
+            elif user_name[1] in qa_pair['question']:
+                sel_facts = select_facts(qa_pair['question'], summarized_facts2, topic_dic2, model, model_type)
+                select_name = user_name[1]
+            else:
+                sel_facts1 = select_facts(qa_pair['question'], summarized_facts1, topic_dic1, model, model_type)
+                sel_facts2 = select_facts(qa_pair['question'], summarized_facts2, topic_dic2, model, model_type)
+                flag = 1
 
-            sel_fact_response_text = fact_prompt(cur_turn, qa_pair['question'], select_facts1, select_facts2)
+            if flag == 0:
+                sel_fact_response_text = sel_fact_prompt(qa_pair['question'], sel_facts, select_name)
+                all_retrevial_dic['select_fact'] = sel_facts
+            else:
+                sel_fact_response_text = fact_prompt(qa_pair['question'], user_name[0], sel_facts1, user_name[1], sel_facts2)
+                all_retrevial_dic['select_fact'] = sel_facts1 + sel_facts2
             all_response_dic['select_fact'] = sel_fact_response_text
+
             print(f'sel_fact_response_text {sel_fact_response_text}')
 
-            all_fact_response_text = fact_prompt(cur_turn, qa_pair['question'], speaker1_fact, speaker2_fact)
+            all_fact_response_text = fact_prompt(qa_pair['question'], user_name[0], speaker1_fact, user_name[1], speaker2_fact)
+            all_retrevial_dic['all_fact'] = speaker1_fact + speaker2_fact
             all_response_dic['all_fact'] = all_fact_response_text
             print(f'all_fact_response_text {all_fact_response_text}')
 
-            long_content_response_text = long_context_prompt(long_content_turn, qa_pair['question'])
+            long_content_response_text = long_context_prompt(prev_conversation, qa_pair['question'], user_name[0], user_name[1])
+            all_retrevial_dic['long_content'] = prev_conversation
             all_response_dic['long_content'] = long_content_response_text
             print(f'long_content_response_text {long_content_response_text}')
 
-            sel_sum_list, sel_org_list = rag_original(qa_pair['question'], summarization_list, conversations[index][:4], model, top_k=2)
-            rag_sumy_response_text = rag_sumy_prompt(cur_turn, sel_sum_list, qa_pair['question'])
+            sel_sum_list, sel_org_list = rag_original(qa_pair['question'], summarization_list, conversations[index], model, top_k=5)
+            rag_sumy_response_text = rag_sumy_prompt(sel_sum_list, qa_pair['question'], user_name[0], user_name[1])
+            all_retrevial_dic['rag_sumy'] = sel_sum_list
             all_response_dic['rag_sumy'] = rag_sumy_response_text
             print(f'rag_sumy_response_text {rag_sumy_response_text}')
 
-            rag_org_response_text = rag_original_prompt(cur_turn, sel_org_list, qa_pair['question'])
+            rag_org_response_text = rag_original_prompt(sel_org_list, qa_pair['question'], user_name[0], user_name[1])
+            all_retrevial_dic['rag_org'] = sel_org_list
             all_response_dic['rag_org'] = rag_org_response_text
             print(f'rag_org_response_text {rag_org_response_text}')
 
-            cur_turn += 'SPEAKER_1: ' + qa_pair['question'] + '\n' + 'SPEAKER_2: ' + qa_pair['answer'] + '\n'
-            long_content_turn += 'SPEAKER_1: ' + qa_pair['question'] + '\n' + 'SPEAKER_2: ' + qa_pair['answer'] + '\n'
-
+            retrevial_texts.append(all_retrevial_dic)
             response_texts.append(all_response_dic)
-        final_response.append(response_texts)
 
-        with open(f'{home_dir}/{dataset_name}/{output_file}', 'w') as f:
+        final_response.append(response_texts)
+        retrieve_text.append(retrevial_texts)
+
+        with open(f'{home_dir}/{dataset_name}/{output_response_file}', 'w') as f:
             json.dump(final_response, f, indent=4)
+        
+        with open(f'{home_dir}/{dataset_name}/{output_retrieve_file}', 'w') as f:
+            json.dump(retrieve_text, f, indent=4)
     
 
 

@@ -4,50 +4,67 @@ import os
 import fire
 #from openai import OpenAI
 import openai
+from tqdm import tqdm
 from data_process import dataset_process
-from utils import sum_fact
+from utils import sum_fact, sum_fact_reasoning
 
-os.environ['OPENAI_API_KEY'] = 'API-KEY'
-os.environ['SAMBANOVA_API_KEY'] = 'API-KEY'
+os.environ['OPENAI_API_KEY'] = ' REMOVED'
+os.environ['SAMBANOVA_API_KEY'] = '64cc4564-5c26-4869-b26c-899278f4c8cd'
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 
 def main(
         home_dir = './datasets',
-        dataset_name = 'locomo',
-        model_type = 'Meta-Llama-3.1-405B-Instruct',
-        output_file = 'summarized_facts.json',
+        data_dir = 'impConv',
+        dataset_name = 'syn_intent',
+        model_type = 'gpt-4o-mini',
+        output_file = 'summarized_intent_facts.json',
     ):
     # if file exist,  load it
     conversations, qa_pairs = dataset_process(home_dir, dataset_name)
-    if os.path.exists(f'{home_dir}/{dataset_name}/{output_file}'):
-        with open(f'{home_dir}/{dataset_name}/{output_file}', 'r') as f:
+    if os.path.exists(f'{home_dir}/{data_dir}/{output_file}'):
+        with open(f'{home_dir}/{data_dir}/{output_file}', 'r') as f:
             conversation_list = json.load(f)
         conversations = conversations[len(conversation_list):]        
     else:
         conversation_list = []
-    for i, conversation in enumerate(conversations):
+    print(f'conversation length: {len(conversation_list)}')
+    for i, conversation in tqdm(enumerate(conversations)):
         dialog_list = []
         for j, dialog in enumerate(conversation):
-            print(dialog)
             dialog_dic = {}
-            print(f'Processing conversation {i}, dialog {j}')
-            while True:
-                try:
-                    response, speaker1, speaker2 = sum_fact(dialog, model_type)
-                    dialog_dic['summary'] = response.split('<<Summary:>>')[1].split(f'<<{speaker1}:>>')[0].strip()
-                    dialog_dic[f'{speaker1}_fact'] = response.split(f'<<{speaker1}:>>')[1].split(f'<<{speaker2}:>>')[0].strip()
-                    dialog_dic[f'{speaker2}_fact'] = response.split(f'<<{speaker2}:>>')[1].strip()
-                    break
-                except Exception as e:
-                    if e == KeyboardInterrupt:
-                        raise e
-                    else:
-                        pass            
+            print(f'Processing conversation {i}, dialog {j}')        
+            if dataset_name == 'syn_intent' or dataset_name == 'syn_reasoning':
+                print('PASS')
+                while True:
+                    try:
+                        response = sum_fact_reasoning(dialog, model_type)
+                        print(response)
+                        dialog_dic['summary'] = response.split('<<Summary:>>')[1].split(f'<<Speaker1:>>')[0].strip()
+                        dialog_dic['Speaker1_fact'] = response.split(f'<<Speaker1:>>')[1].strip()
+                        break
+                    except Exception as e:
+                        if e == KeyboardInterrupt:
+                            raise e
+                        else:
+                            pass                
+            else:
+                while True:
+                    try:
+                        response, speaker1, speaker2 = sum_fact(dialog, model_type)
+                        dialog_dic['summary'] = response.split('<<Summary:>>')[1].split(f'<<{speaker1}:>>')[0].strip()
+                        dialog_dic[f'{speaker1}_fact'] = response.split(f'<<{speaker1}:>>')[1].split(f'<<{speaker2}:>>')[0].strip()
+                        dialog_dic[f'{speaker2}_fact'] = response.split(f'<<{speaker2}:>>')[1].strip()
+                        break
+                    except Exception as e:
+                        if e == KeyboardInterrupt:
+                            raise e
+                        else:
+                            pass
             dialog_list.append(dialog_dic)
         conversation_list.append(dialog_list)
     
-        with open(f'{home_dir}/{dataset_name}/{output_file}', 'w') as f:
+        with open(f'{home_dir}/{data_dir}/{output_file}', 'w') as f:
             json.dump(conversation_list, f, indent=4)
 
 

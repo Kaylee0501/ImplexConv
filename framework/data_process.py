@@ -9,6 +9,18 @@ import openai
 ##conversations: list of list of strings, each string is a dialog session
 ##qa_pairs: list of list of dictionaries, each dictionary has 'question' and 'answer' keys
 
+
+def remove_before_substring(sentence_list):
+    new_sentence_list = []
+    for sentence in sentence_list:
+        index = sentence.find('Speaker1:')
+        if index != -1:
+            new_sentence_list.append(sentence[index:])
+        else:
+            new_sentence_list.append(sentence)
+    return new_sentence_list
+        
+
 def dataset_process(home_dir, dataset_name):
     if dataset_name == 'MSC':
         input_file = f'{home_dir}/MSC/sequential_msc.json'
@@ -146,4 +158,54 @@ def dataset_process(home_dir, dataset_name):
                if qa['question'][:4] != 'When':
                    select_qa_pair.append(qa)
             qa_pairs.append(select_qa_pair)
+        return conversations, qa_pairs
+    
+    elif dataset_name == 'syn_reasoning':
+        input_file = f'{home_dir}/impConv/syn_full_conv.json'
+        with open(input_file, 'r') as f:
+            data = json.load(f)
+        ## conversations include the 1-35 sessions
+        ## qa_pairs from the locomo dataset 
+        conversations = []
+        qa_pairs = []
+        curr_conv = []
+        curr_qa = []
+        for i, item in enumerate(data):
+            curr_conv.extend(remove_before_substring([item['syn_trait_conv']]))
+            curr_conv.extend(remove_before_substring([item['syn_reasoning_conv']]))
+            curr_conv.extend(remove_before_substring(item['noisy_conv']))
+            curr_conv.extend(remove_before_substring(item['noisy_cc_conv']))
+            curr_conv.extend(remove_before_substring(item['noisy_ultrachat_conv']))
+            curr_conv.extend(remove_before_substring(item['noisy_redial_conv']))
+            curr_qa.append({'question': item['question'], 'answer': item['reason']})
+            if (i + 1) % 5 == 0:
+                conversations.append(curr_conv)
+                qa_pairs.append(curr_qa)
+                curr_conv = []
+                curr_qa = []
+
+        return conversations, qa_pairs
+
+    elif dataset_name == 'syn_intent':
+        input_file = f'{home_dir}/impConv/intent_full_conv.json'
+        with open(input_file, 'r') as f:
+            data = json.load(f)
+        ## conversations include the 1-35 sessions
+        ## qa_pairs from the locomo dataset 
+        conversations = []
+        qa_pairs = []
+        curr_conv = []
+        curr_qa = []
+        for i, item in enumerate(data):
+            curr_conv.extend(remove_before_substring(item['implic_intent_conv']))
+            curr_conv.extend(remove_before_substring(item['noisy_cc_conv']))
+            curr_conv.extend(remove_before_substring(item['noisy_ultrachat_conv']))
+            curr_conv.extend(remove_before_substring(item['noisy_redial_conv']))
+            curr_qa.append({'question': item['question'], 'answer': 'Yes.', 'target_conv': item['implic_intent_conv']})
+            if (i + 1) % 5 == 0:
+                conversations.append(curr_conv)
+                qa_pairs.append(curr_qa)
+                curr_conv = []
+                curr_qa = []
+
         return conversations, qa_pairs

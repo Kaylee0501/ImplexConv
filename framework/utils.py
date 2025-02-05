@@ -2,6 +2,10 @@ import json
 import os
 import openai
 from openai import OpenAI
+from openai import AsyncOpenAI
+import asyncio
+import time
+from tqdm import tqdm
 from nltk.translate.bleu_score import (
     sentence_bleu,
     SmoothingFunction,
@@ -13,7 +17,7 @@ os.environ['OPENAI_API_KEY'] = 'API-KEY'
 os.environ['SAMBANOVA_API_KEY'] = 'API-KEY'
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-def sum_fact_old(scenario, model_type):
+def sum_fact_main(scenario, model_type):
     speaker1 = scenario.split('\n')[0].split(':')[0]
     speaker2 = scenario.split('\n')[1].split(':')[0]
     
@@ -43,7 +47,63 @@ def sum_fact_old(scenario, model_type):
     response = str(completion.choices[0].message.content)
     return response, speaker1, speaker2
 
-def sum_fact(scenario, model_type):
+def openai_async_inference(messages, tqdm_description="Calling OpenAI API", model_name=None, parse_json=True, batch_size=20):
+    """get response with async openai api"""
+
+    if 'gpt' in model_name:
+        client = AsyncOpenAI(
+            api_key=os.environ.get('OPENAI_API_KEY'),
+        )
+    else:
+        client = AsyncOpenAI(
+            api_key=os.environ.get('TOGETHER_API_KEY'),
+            base_url=os.environ.get('TOGETHER_BASE_URL'),
+        )
+    
+    async def get_response(msg, index):
+        completion = await client.chat.completions.create(
+            model=model_name,
+            messages=msg,
+        )
+        return completion.choices[0].message.content, index
+    
+    async def get_all_responses(msgs):
+        # Create a list of TaskWrapper objects
+        tasks = [get_response(msg, i) for i, msg in enumerate(msgs)]
+
+        results = [None] * len(msgs) # Initialize results list with the same length as input
+        with tqdm(total=len(tasks), desc=tqdm_description, position=1, leave=False) as pbar:
+            for future in asyncio.as_completed(tasks):
+                result = await future
+                results[result[1]] = result[0] # index the result with the original index
+                pbar.update(1)
+
+        return results
+    
+    if batch_size == -1:
+        # Get the current event loop
+        loop = asyncio.get_event_loop()
+        # Run the async function within the existing event loop
+        completions = loop.run_until_complete(get_all_responses(messages))
+        time.sleep(1)
+    else:
+        # rate limit for together api
+        completions = []
+        for i in range(0, len(messages), batch_size):
+            # Get the current event loop
+            loop = asyncio.get_event_loop()
+            # Run the async function within the existing event loop
+            completions.extend(loop.run_until_complete(get_all_responses(messages[i:i+batch_size])))
+            # time.sleep(5)
+
+    final_outputs = []
+    for completion in completions:
+        final_outputs.append(completion.strip())
+
+    return final_outputs
+
+
+def sum_fact_all(scenario, model_type):
     speaker1 = scenario.split('\n')[0].split(':')[0]
     speaker2 = scenario.split('\n')[1].split(':')[0]
     
@@ -73,6 +133,34 @@ def sum_fact(scenario, model_type):
     response = str(completion.choices[0].message.content)
     return response, speaker1, speaker2
 
+
+def sum_fact_all_batch(scenarios, model_name):
+    
+    prompt = ''' Given {scenario}.
+    Can you first summarize the conversation to only contain the main information with the format <<Summary:>>,
+    and then find all the key personalization facts for both {speaker1} and {speaker2} from the raw conversation. 
+    Please only output facts without any other reasons or further explanation with the format:
+    <<{speaker1}:>> (1). (2). (3)....
+    <<{speaker2}:>> (1). (2). (3)....
+    '''
+    prompts = []
+    for scenario in scenarios:
+        speaker1 = scenario.split('\n')[0].split(':')[0]
+        speaker2 = scenario.split('\n')[1].split(':')[0]
+        prompts.append(prompt.format(scenario=scenario, speaker1=speaker1, speaker2=speaker2))
+        
+    messages = []
+    for inp in prompts:
+        messages.append([
+            {"role": "system", "content": "You are an expert in generate high level personal traits."},
+            {"role": "user", "content": inp }
+        ])
+    return openai_async_inference(messages,
+                                  model_name = model_name,
+                                  tqdm_description="Calling OpenAI API",
+                                  batch_size=-1)
+
+
 def sum_fact_reasoning(scenario, model_type):
     
     if model_type == 'Meta-Llama-3.1-405B-Instruct':
@@ -99,6 +187,66 @@ def sum_fact_reasoning(scenario, model_type):
     )
     response = str(completion.choices[0].message.content)
     return response
+
+def sum_fact_reasoning_batch(scenarios, model_name):
+    
+    prompt = ''' Given {scenario}.
+    Can you first summarize the conversation to only contain the main information with the format <<Summary:>>,
+    and then find the summarized key personalization facts for Speaker1 that already happened and only include long-term effects. 
+    Please only output facts without any other reasons or further explanation with the format:
+    <<Speaker1:>> (1). (2). (3)....
+    '''
+    prompts = [prompt.format(scenario=scenario) for scenario in scenarios]
+    messages = []
+    for inp in prompts:
+        messages.append([
+            {"role": "system", "content": "You are an expert in generate high level personal traits."},
+            {"role": "user", "content": inp }
+        ])
+    return openai_async_inference(messages,
+                                  model_name = model_name,
+                                  tqdm_description="Calling OpenAI API",
+                                  batch_size=-1)
+
+
+def select_reasoning_question_batch(facts, question, model_name):
+    
+    prompt = '''
+    Given the persona traits: {fact}.
+    Can the above traits directly affect the answer of question: {question}?
+    Please output only 'YES' or 'NO'.
+    '''
+    prompts = [prompt.format(fact=fact, question=question) for fact in facts]
+    messages = []
+    for inp in prompts:
+        messages.append([
+            {"role": "system", "content": "You are an expert in generate high level personal traits."},
+            {"role": "user", "content": inp }
+        ])
+    return openai_async_inference(messages,
+                                  model_name = model_name,
+                                  tqdm_description="Calling OpenAI API",
+                                  batch_size=-1)
+
+
+def implic_reason_batch(facts, question, model_name):
+    prompt = '''
+    Given the information: {fact}.
+    Could that implys the question that {question}?
+    Then answer shoud only be <<YES>> or <<NO>> without anything else.
+    '''
+    prompts = [prompt.format(fact=fact, question=question) for fact in facts]
+    messages = []
+    for inp in prompts:
+        messages.append([
+            {"role": "system", "content": "You are an expert in answering questions."},
+            {"role": "user", "content": inp }
+        ])
+    return openai_async_inference(messages,
+                                  model_name = model_name,
+                                  tqdm_description="Calling OpenAI API",
+                                  batch_size=-1)
+
 
 def evaluate_bleu(reference, response):
     # Convert reference and response to list of tokens

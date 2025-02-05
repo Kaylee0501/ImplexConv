@@ -161,15 +161,14 @@ def dataset_process(home_dir, dataset_name):
         return conversations, qa_pairs
     
     elif dataset_name == 'syn_reasoning':
-        input_file = f'{home_dir}/impConv/syn_full_conv.json'
+        input_file = f'{home_dir}/{dataset_name}/syn_full_conv.json'
         with open(input_file, 'r') as f:
-            data = json.load(f)
-        ## conversations include the 1-35 sessions
-        ## qa_pairs from the locomo dataset 
+            data = json.load(f)        
+        with open(f'{home_dir}/{dataset_name}/reasoning_question.json', 'r') as f:
+            qa_pairs = json.load(f)
+
         conversations = []
-        qa_pairs = []
         curr_conv = []
-        curr_qa = []
         for i, item in enumerate(data):
             curr_conv.extend(remove_before_substring([item['syn_trait_conv']]))
             curr_conv.extend(remove_before_substring([item['syn_reasoning_conv']]))
@@ -177,17 +176,15 @@ def dataset_process(home_dir, dataset_name):
             curr_conv.extend(remove_before_substring(item['noisy_cc_conv']))
             curr_conv.extend(remove_before_substring(item['noisy_ultrachat_conv']))
             curr_conv.extend(remove_before_substring(item['noisy_redial_conv']))
-            curr_qa.append({'question': item['question'], 'answer': item['reason']})
+
             if (i + 1) % 5 == 0:
                 conversations.append(curr_conv)
-                qa_pairs.append(curr_qa)
                 curr_conv = []
-                curr_qa = []
 
         return conversations, qa_pairs
 
     elif dataset_name == 'syn_intent':
-        input_file = f'{home_dir}/impConv/intent_full_conv.json'
+        input_file = f'{home_dir}/{dataset_name}/intent_full_conv.json'
         with open(input_file, 'r') as f:
             data = json.load(f)
         ## conversations include the 1-35 sessions
@@ -202,7 +199,7 @@ def dataset_process(home_dir, dataset_name):
             curr_conv.extend(remove_before_substring(item['noisy_ultrachat_conv']))
             curr_conv.extend(remove_before_substring(item['noisy_redial_conv']))
             curr_qa.append({'question': item['question'], 'answer': 'Yes.', 'target_conv': item['implic_intent_conv']})
-            if (i + 1) % 5 == 0:
+            if (i + 1) % 6 == 0:
                 conversations.append(curr_conv)
                 qa_pairs.append(curr_qa)
                 curr_conv = []

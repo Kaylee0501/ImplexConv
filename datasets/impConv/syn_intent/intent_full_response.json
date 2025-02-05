@@ -1,0 +1,250 @@
+[
+    [
+        {
+            "ground_truth": "No.",
+            "question": "Did this person lose an opportunity to meet Hemingway?",
+            "select_summary": "NO",
+            "select_fact": "No",
+            "all_fact": "No",
+            "long_content": "YES",
+            "rag_sumy": "No",
+            "rag_org": "No."
+        },
+        {
+            "ground_truth": "YES",
+            "question": "Is this person looking for activities that can be enjoyed by both children and their grandparents?",
+            "select_summary": "YES",
+            "select_fact": "YES",
+            "all_fact": "YES",
+            "long_content": "YES",
+            "rag_sumy": "YES",
+            "rag_org": "YES"
+        },
+        {
+            "ground_truth": "No.",
+            "question": "Does this person often enter their vehicles in local shows?",
+            "select_summary": "No.",
+            "select_fact": "No",
+            "all_fact": "No",
+            "long_content": "YES",
+            "rag_sumy": "No",
+            "rag_org": "No."
+        },
+        {
+            "ground_truth": "No.",
+            "question": "Is this person always alert for potential threats from the sky?",
+            "select_summary": "YES",
+            "select_fact": "No",
+            "all_fact": "YES",
+            "long_content": "YES",
+            "rag_sumy": "No",
+            "rag_org": "YES"
+        },
+        {
+            "ground_truth": "YES",
+            "question": "Is this person a cynic?",
+            "select_summary": "NO",
+            "select_fact": "YES",
+            "all_fact": "NO",
+            "long_content": "YES",
+            "rag_sumy": "No",
+            "rag_org": "No."
+        },
+        {
+            "ground_truth": "YES",
+            "question": "Is this person a senior?",
+            "select_summary": "No",
+            "select_fact": "No",
+            "all_fact": "No",
+            "long_content": "No.",
+            "rag_sumy": "NO",
+            "rag_org": "No."
+        }
+    ],
+    [
+        {
+            "ground_truth": "No.",
+            "question": "Is this person a fan of Peaky Blinders?",
+            "select_summary": "YES",
+            "select_fact": "YES",
+            "all_fact": "YES",
+            "long_content": "NO",
+            "rag_sumy": "No",
+            "rag_org": "No."
+        },
+        {
+            "ground_truth": "Yes.",
+            "question": "Is Daniel Hand an avid enthusiast of genealogy?",
+            "select_summary": "No.",
+            "select_fact": "No",
+            "all_fact": "YES",
+            "long_content": "NO",
+            "rag_sumy": "No.",
+            "rag_org": "NO"
+        },
+        {
+            "ground_truth": "No.",
+            "question": "Does this person love all animals?",
+            "select_summary": "YES",
+            "select_fact": "YES",
+            "all_fact": "No.",
+            "long_content": "YES",
+            "rag_sumy": "YES",
+            "rag_org": "YES"
+        },
+        {
+            "ground_truth": "YES",
+            "question": "Does this person believe in the beauty of all creatures?",
+            "select_summary": "YES",
+            "select_fact": "YES",
+            "all_fact": "YES",
+            "long_content": "YES",
+            "rag_sumy": "YES",
+            "rag_org": "YES"
+        },
+        {
+            "ground_truth": "YES",
+            "question": "Does this person reflect on the past season with nostalgia?",
+            "select_summary": "YES",
+            "select_fact": "NO",
+            "all_fact": "YES",
+            "long_content": "YES",
+            "rag_sumy": "YES",
+            "rag_org": "YES"
+        },
+        {
+            "ground_truth": "YES",
+            "question": "Does this person enjoy exploring Copenhagen's cultural offerings?",
+            "select_summary": "YES",
+            "select_fact": "YES",
+            "all_fact": "YES",
+            "long_content": "YES",
+            "rag_sumy": "YES",
+            "rag_org": "YES"
+        }
+    ],
+    [
+        {
+            "ground_truth": "No.",
+            "question": "Does this person spend time with their British expat friend?",
+            "select_summary": "YES",
+            "select_fact": "YES",
+            "all_fact": "YES",
+            "long_content": "NO",
+            "rag_sumy": "NO",
+            "rag_org": "NO"
+        },
+        {
+            "ground_truth": "YES",
+            "question": "Is this person a young reader?",
+            "select_summary": "No.",
+            "select_fact": "No.",
+            "all_fact": "YES",
+            "long_content": "No.",
+            "rag_sumy": "NO",
+            "rag_org": "NO"
+        },
+        {
+            "ground_truth": "YES",
+            "question": "Is this person timid?",
+            "select_summary": "YES",
+            "select_fact": "YES",
+            "all_fact": "YES",
+            "long_content": "YES",
+            "rag_sumy": "YES",
+            "rag_org": "YES"
+        },
+        {
+            "ground_truth": "YES",
+            "question": "Has this person formed a special bond with a lively elderly woman?",
+            "select_summary": "Yes.",
+            "select_fact": "No.",
+            "all_fact": "NO",
+            "long_content": "YES",
+            "rag_sumy": "NO",
+            "rag_org": "NO"
+        },
+        {
+            "ground_truth": "YES",
+            "question": "Is this person concerned about the influence of extreme religious views on families?",
+            "select_summary": "YES",
+            "select_fact": "Yes",
+            "all_fact": "YES",
+            "long_content": "YES",
+            "rag_sumy": "NO",
+            "rag_org": "YES"
+        },
+        {
+            "ground_truth": "YES",
+            "question": "Is this person a homebody who enjoys the comforts of their own town?",
+            "select_summary": "YES",
+            "select_fact": "YES",
+            "all_fact": "YES",
+            "long_content": "YES",
+            "rag_sumy": "No",
+            "rag_org": "NO"
+        }
+    ],
+    [
+        {
+            "ground_truth": "No.",
+            "question": "Does this person support conservative politics?",
+            "select_summary": "No",
+            "select_fact": "No",
+            "all_fact": "YES",
+            "long_content": "No.",
+            "rag_sumy": "YES",
+            "rag_org": "No."
+        },
+        {
+            "ground_truth": "YES",
+            "question": "Does this person have zero interest in motor racing?",
+            "select_summary": "No.",
+            "select_fact": "NO",
+            "all_fact": "No.",
+            "long_content": "NO",
+            "rag_sumy": "No",
+            "rag_org": "No."
+        },
+        {
+            "ground_truth": "No.",
+            "question": "Does this person plan family vacations down to the smallest detail?",
+            "select_summary": "YES",
+            "select_fact": "YES",
+            "all_fact": "YES",
+            "long_content": "YES",
+            "rag_sumy": "YES",
+            "rag_org": "YES"
+        },
+        {
+            "ground_truth": "YES",
+            "question": "Does this person look up to their parent?",
+            "select_summary": "YES",
+            "select_fact": "NO",
+            "all_fact": "YES",
+            "long_content": "YES",
+            "rag_sumy": "YES",
+            "rag_org": "YES"
+        },
+        {
+            "ground_truth": "YES",
+            "question": "Does this person have an unparalleled fondness for organization?",
+            "select_summary": "YES",
+            "select_fact": "YES",
+            "all_fact": "YES",
+            "long_content": "YES",
+            "rag_sumy": "YES",
+            "rag_org": "YES"
+        },
+        {
+            "ground_truth": "No.",
+            "question": "Is this person a loyal fan of Vitaly Bigdash?",
+            "select_summary": "NO",
+            "select_fact": "No",
+            "all_fact": "No.",
+            "long_content": "NO",
+            "rag_sumy": "NO",
+            "rag_org": "No."
+        }
+    ]
+]

@@ -8,8 +8,7 @@ from tqdm import tqdm
 from data_process import dataset_process
 from utils import sum_fact, sum_fact_reasoning
 
-os.environ['OPENAI_API_KEY'] = 'API-KEY'
-os.environ['SAMBANOVA_API_KEY'] = 'API-KEY'
+os.environ['OPENAI_API_KEY'] = 'API_KEY'
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 

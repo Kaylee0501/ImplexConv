@@ -103,7 +103,7 @@ def openai_async_inference(messages, tqdm_description="Calling OpenAI API", mode
     return final_outputs
 
 
-def sum_fact_all(scenario, model_type):
+def get_all_facts(scenario, model_type):
     speaker1 = scenario.split('\n')[0].split(':')[0]
     speaker2 = scenario.split('\n')[1].split(':')[0]
     
@@ -115,10 +115,9 @@ def sum_fact_all(scenario, model_type):
     else:
         client = OpenAI()
 
-    prompt = f''' Given {scenario}.
-    Can you first summarize the conversation to only contain the main information with the format <<Summary:>>,
-    and then find all the key personalization facts for both {speaker1} and {speaker2} from the raw conversation. 
-    Please only output facts without any other reasons or further explanation with the format:
+    prompt = f''' Given conversation between {speaker1} and {speaker2}: {scenario}.
+    Can you find all of the facts for {speaker1} and {speaker2}?
+    You need to find the facts as many as possible, and please only output facts without any other reasons or further explanation with the format: 
     <<{speaker1}:>> (1). (2). (3)....
     <<{speaker2}:>> (1). (2). (3)....
     '''
@@ -132,6 +131,33 @@ def sum_fact_all(scenario, model_type):
     )
     response = str(completion.choices[0].message.content)
     return response, speaker1, speaker2
+
+def get_summary(scenario, model_type):
+    speaker1 = scenario.split('\n')[0].split(':')[0]
+    speaker2 = scenario.split('\n')[1].split(':')[0]
+    
+    if model_type == 'Meta-Llama-3.1-405B-Instruct':
+        client = openai.OpenAI(
+            api_key=os.environ.get("SAMBANOVA_API_KEY"),
+            base_url="https://api.sambanova.ai/v1",
+        )
+    else:
+        client = OpenAI()
+
+    prompt = f''' Given conversation between {speaker1} and {speaker2}: {scenario}.
+    Can you summarize the conversation to only contain the main information with the format: 
+    <<Summary:>>...
+    '''
+    completion = client.chat.completions.create(
+        # model="gpt-4-turbo-preview",
+        model= model_type,
+        messages=[
+            {"role": "system", "content": "You are an expert in generate high level personal question."},
+            {"role": "user", "content": prompt }
+        ]
+    )
+    response = str(completion.choices[0].message.content)
+    return response
 
 
 def sum_fact_all_batch(scenarios, model_name):
@@ -192,7 +218,7 @@ def sum_fact_reasoning_batch(scenarios, model_name):
     
     prompt = ''' Given {scenario}.
     Can you first summarize the conversation to only contain the main information with the format <<Summary:>>,
-    and then find the summarized key personalization facts for Speaker1 that already happened and only include long-term effects. 
+    and then find all of the personalization facts for Speaker1 from the raw conversation. 
     Please only output facts without any other reasons or further explanation with the format:
     <<Speaker1:>> (1). (2). (3)....
     '''
@@ -283,6 +309,33 @@ def calculate_rouge_l(candidate, reference):
     # Compute ROUGE-L
     scores = scorer.score(reference, candidate)
     return scores['rougeL']
+
+def evaluation(full_response, model_type):
+    avg_bleu_1 = 0
+    avg_bleu_2 = 0
+    avg_bleu_3 = 0
+    avg_rouge_precision = 0
+    avg_rouge_recall = 0
+    count = 0
+    for exp in full_response:
+        for session in exp:
+            ground_truths = session["ground_truth"]
+            bleu_1, bleu_2, bleu_3 = evaluate_bleu(ground_truths, session[model_type])
+            rouge_l = calculate_rouge_l(ground_truths, session[model_type])
+            avg_bleu_1 += bleu_1 
+            avg_bleu_2 += bleu_2
+            avg_bleu_3 += bleu_3
+            avg_rouge_precision += rouge_l.precision
+            avg_rouge_recall += rouge_l.recall
+            count += 1
+    
+    avg_bleu_1 /= count
+    avg_bleu_2 /= count
+    avg_bleu_3 /= count
+    avg_rouge_precision /= count
+    avg_rouge_recall /= count
+    
+    return avg_bleu_1, avg_bleu_2, avg_bleu_3, avg_rouge_precision, avg_rouge_recall
 
 def process_sessions(file_path):
     sessions = []

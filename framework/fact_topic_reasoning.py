@@ -352,11 +352,10 @@ def main(
         response_texts = []
         retrevial_texts = []
         for qa_pair in questions[index]:
-            all_response_dic = {'generate_answer': ground_truth_prompt(qa_pair['question'], qa_pair['target_conv'], model_type)}
             all_response_dic['question'] = qa_pair['question']
             all_response_dic['ground_truth'] = qa_pair['answer']
             all_retrevial_dic = {'question': qa_pair['question']}
-            all_retrevial_dic['ground_truth_conv'] = qa_pair['target_conv']
+            all_retrevial_dic['ground_truth_conv'] = qa_pair['retrieved_conv']
             all_retrevial_dic['ground_truth_answer'] = qa_pair['answer']
             select_facts1, select_summary1 = summarizer.find_related_facts(qa_pair['question'])
 

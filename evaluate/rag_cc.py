@@ -103,7 +103,7 @@ import time
 
 chat = ChatSambaNovaCloud(
     sambanova_url = "https://api.sambanova.ai/v1/chat/completions",
-    sambanova_api_key = "56349ebd-647f-4b94-9c89-4358d1a708f5",
+    sambanova_api_key = "API-key",
     model = "Meta-Llama-3.1-405B-Instruct",
     max_tokens = 1024,
 )
